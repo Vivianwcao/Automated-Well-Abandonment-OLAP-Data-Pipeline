@@ -6,32 +6,35 @@
 
 ## A Serverless Data Lakehouse Architecture for OLAP
 
-**Tech Stack & Environment**
-- **Languages & Frameworks:** Python, Pandas, OpenPyXL, PyArrow
-- **Serverless Data Infra:** AWS AppFlow, S3, EventBridge, SQS + DLQ, AWS Lambda
-- **Analytics & AI Layer:** Claude Haiku (AWS Bedrock), AWS Glue, Athena, QuickSight
-## Business Impact & Core Design
-- **Unlocked Dark Data:** Converted 750+ manual, isolated legacy multi-tab XLSX workbooks into an active, queryable data asset.
-- **Zero Infrastructure Overhead:** Designed a 100% serverless OLAP architecture. No idle compute, no persistent clusters, costing a fraction of a traditional Redshift or Snowflake deployment.
-- **Executive Insights:** Enabled three automated QuickSight dashboards tracking well scorecards, supplier costs, and regulatory compliance.
+**Tech Stack**
+- **Languages & Libraries** Python, Pandas, OpenPyXL, PyArrow
+- **AWS Infrastructure** AWS AppFlow, S3, EventBridge, SQS + DLQ, AWS Lambda
+- **Analytics & AI Layer & BI:** Claude Haiku (AWS Bedrock), AWS Glue, Athena, QuickSight(SPICE)
+
+## Project Scope & Business Value
+- **Historical Data Ingestion:** Processed 750+ legacy .xlsm/.xlsx field reports spanning 5 years of historical oil and gas operations in Alberta.
+- **Analytics Readiness:** Transformed disjointed, hand-entered spreadsheet data into 5 normalized relational tables, enabling long-term trend analysis.
+- **Cost & Performance Optimization:** Built an entire OLAP pipeline using a serverless architecture to eliminate idle infrastructure costs, utilizing in-memory caching for downstream BI reporting.
+- 
 ## Architecture & Medallion Data Flow
+The pipeline implements an event-driven **Medallion Architecture** to ingest, parse, and enrich data step-by-step:
 
-The pipeline implements a decoupled, event-driven Medallion Architecture to securely ingest, process, and enrich data:
+- **Bronze (S3 raw/):** Raw, multi-tabbed Excel workbooks transferred from Google Drive via AWS AppFlow.
+- **Silver (S3 extracted/):** Intermediate structured JSON containing raw data pulled from cell-anchored parsing.
+- **Gold (S3 clean/):** Schema-enforced, LLM-enriched Parquet datasets partitioned into 5 base data tables.
 
-- **Bronze (S3 raw/):** Untouched legacy .xlsm files ingested via AWS AppFlow.
-- **Silver (S3 extracted/):** Clean, structured intermediate JSON generated via cell-anchored extraction.
-- **Gold (S3 clean/):** Schema-enforced, LLM-enriched Parquet datasets partitioned into 5 key business metrics (main, charges, wells, etc.).
-## Fault Tolerance & Zero-Loss Data Redriving
-- **The Challenge:** Processing unstructured legacy files means edge-case failures are inevitable. If a single file fails mid-pipeline, the entire bulk upload shouldn't need to be restarted.
+## Technical Challenges
+- **The Challenge:** Transferring 750 historical files simultaneously via AppFlow creates a massive burst of objects landing in S3. If S3 triggered the processing Lambdas directly, it would instantly flood the system, spike concurrent invocations, and trigger AWS account-level throttling.
 
-- **The Solution:** Implemented dedicated Dead-Letter Queues (DLQ 1 & DLQ 2) on failure paths. A CloudWatch DLQ depth alarm triggers an SNS email notification the moment an item drops out. Failed payloads can be easily analyzed, fixed, and redriven directly from the DLQ without re-uploading the source files.
-## Brittle Layouts vs. Visual Excel Forms
-- **The Challenge:** Field supervisors used Excel as a visual form (merged cells, inconsistent rows, hand-aligned text labels). Standard pd.read_excel() scripts failed instantly across highly variable supervisor layouts.
+- **The Solution:** Decoupled the ingestion layer using **Amazon EventBridge and SQS Queues**. EventBridge monitors the S3 bucket prefixes and routes object creation events into SQS. SQS acts as a buffer, metering message delivery to downstream Lambdas at a controlled, predictable execution rate.
+  
+## Layout Drift in Hand-Entered Excel Forms (5-Year Span)
+- **The Challenge:** Field supervisors filled out these sheets by hand over a 5-year period. The spreadsheets were designed to be visually appealing to human readers rather than machine-readable (utilizing merged cells, inconsistent row heights, and erratic label alignments). Standard coordinate-based parsing via pd.read_excel() broke immediately due to historical layout variations.
 
-- **The Solution:** Developed a dynamic anchor-based cell detection engine using openpyxl. Instead of reading rigid row/column coordinates, the script scans for known keyword text labels and extracts data from neighboring cells using relative directional offsets, wiping out silent parsing errors.
-## Context Extraction from Handwritten Field Notes
+- **The Solution:** Built an anchor-based cell detection mechanism using openpyxl. The script scans sheets for known text strings (labels) and dynamically extracts data from adjacent or relative offsets rather than hardcoded cell coordinates. This stopped layout changes from causing silent parsing failures.
 
-- **The Challenge:** Critical operational and regulatory data (e.g., plug depths, cement volume, pressure tests) was trapped inside free-text paragraphs. Traditional regex was useless because it lacked the domain context to distinguish a successful test from a tool activation failure.
+## Multi-Tab Relational Mapping
+- **The Challenge:** Each Excel workbook contains multiple tabs. These tabs do not map 1:1 into neat database tables; instead, data must be extracted across several tabs and joined logically to construct a complete, accurate understanding of the operational event.
 
 - **The Solution:** Prompt-engineered Claude Haiku on AWS Bedrock to handle domain-specific text evaluation. The model ingests daily free-text summaries and returns strongly typed, structured JSON classifying well events, separating operational parameters, and converting units automatically.
 ## Downstream Schema Drift in Parquet / Glue
