@@ -46,10 +46,6 @@
 <img width="932" height="815" alt="image" src="https://github.com/user-attachments/assets/88c04dc6-b68e-417c-ba14-369c8b656fdb" />
 
 
-
-https://github.com/user-attachments/assets/13eaa9f0-97b0-4b40-9496-a2f6f893c84f
-
-
 ### 4. Schema Coercion & Catalog Stability
 * **Challenge:** Processing hundreds of independently created files leads to implicit type mismatches in Pandas/PyArrow (e.g., empty columns inferred as `float` in one file and `string` in another), causing Glue Crawlers or Athena queries to fail.
 * **Solution:** Enforced a centralized `MASTER_SCHEMA` dictionary during Lambda 2 execution. Every DataFrame is forcibly coerced prior to Parquet conversion: missing columns are injected as nulls, numbers pass through `pd.to_numeric(errors='coerce')`, and booleans map to pandas' nullable Boolean type.
@@ -68,7 +64,7 @@ AWS Glue catalogs the Silver Parquet datasets into 5 base tables in Athena. To n
 
 ### QuickSight Reporting
 Amazon QuickSight connects to the Gold Athena SQL views via the **SPICE in-memory calculation engine** on a periodic refresh schedule. This isolates dashboard user traffic (filtering bar charts, cost trends, and compliance metrics) from executing live S3 queries in Athena, minimizing query costs and latency.
-<img width="800" height="450" alt="quicksight_owa" src="https://github.com/user-attachments/assets/d4889c0d-785a-4405-9083-b9deab04693c" />
+https://github.com/user-attachments/assets/13eaa9f0-97b0-4b40-9496-a2f6f893c84f
 
 ---
 
